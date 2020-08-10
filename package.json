@@ -1,0 +1,29 @@
+{
+  "name": "oex-products",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "npm run compile && mocha --exit --recursive --timeout 15000",
+    "compile": "npx oz compile --solc-version=0.5.16 --optimizer on"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@chainlink/contracts": "0.0.3",
+    "@openzeppelin/cli": "^2.8.2",
+    "@openzeppelin/contracts": "^2.5.1",
+    "@openzeppelin/contracts-ethereum-package": "^2.5.0",
+    "@openzeppelin/upgrades": "^2.8.0",
+    "@truffle/hdwallet-provider": "^1.0.35",
+    "@uniswap/v2-periphery": "^1.1.0-beta.0",
+    "opium-contracts": "git+https://github.com/OpiumProtocol/opium-contracts.git"
+  },
+  "devDependencies": {
+    "@openzeppelin/test-environment": "^0.1.4",
+    "@openzeppelin/test-helpers": "^0.5.5",
+    "chai": "^4.2.0",
+    "eslint": "^7.0.0",
+    "mocha": "^7.1.2"
+  }
+}

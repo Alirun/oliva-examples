@@ -1,0 +1,11 @@
+# NodejS
+node_modules/
+
+# Contracts
+build/
+
+# Testing
+test-environment.config.js
+
+# Ddeploying
+networks.js
