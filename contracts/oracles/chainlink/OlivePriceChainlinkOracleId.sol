@@ -1,13 +1,14 @@
 pragma solidity 0.5.16;
 
-import "@chainlink/contracts/src/v0.5/dev/AggregatorInterface.sol";
+import "@chainlink/contracts/src/v0.5/ChainlinkClient.sol";
+import "@chainlink/contracts/src/v0.5/interfaces/LinkTokenInterface.sol";
 
 import "openzeppelin-solidity/contracts/ownership/Ownable.sol";
 
 import "opium-contracts/contracts/Interface/IOracleId.sol";
 import "opium-contracts/contracts/OracleAggregator.sol";
 
-contract ETHDAIChainlinkOracleId is IOracleId, Ownable {
+contract OlivePriceChainlinkOracleId is ChainlinkClient, IOracleId, Ownable {
   using SafeMath for uint256;
 
   event Requested(bytes32 indexed queryId, uint256 indexed timestamp);
@@ -19,33 +20,50 @@ contract ETHDAIChainlinkOracleId is IOracleId, Ownable {
   OracleAggregator public oracleAggregator;
 
   // Chainlink
-  AggregatorInterface internal ref;
-  uint256 public CHAINLINK_ETH_BASE;
-  uint256 public DAI_DECIMALS;
+  address public oracle;
+  bytes32 public jobId;
+  uint256 public fee;
 
   // Governance
   uint256 public EMERGENCY_PERIOD;
 
-  constructor(AggregatorInterface _chainlinkAggregator, OracleAggregator _oracleAggregator, uint256 _emergencyPeriod) public {
-    ref = _chainlinkAggregator;
+  // Price data
+  uint256 public price;
+  
+
+  constructor(OracleAggregator _oracleAggregator, uint256 _emergencyPeriod) public {
     oracleAggregator = _oracleAggregator;
-
-    CHAINLINK_ETH_BASE = 1e18;
-    DAI_DECIMALS = 1e18;
-
     EMERGENCY_PERIOD = _emergencyPeriod;
+
+    setPublicChainlinkToken();
+    /**
+    Rinkeby
+     */
+    oracle = 0x7AFe1118Ea78C1eae84ca8feE5C65Bc76CcF879e;
+    jobId = "6d1bfe27e7034b1d87b5270556b17277";
+    fee = 0.1 * 10 ** 18; // 0.1 LINK
+    
+    /**
+     * Kovan
+     */
+    /*
+    oracle = 0x2f90A6D021db21e1B2A077c5a37B3C7E75D15b7e;
+    jobId = "29fa9aa13bf1468788b7cc4a500a45b8";
+    fee = 0.1 * 10 ** 18; // 0.1 LINK
+        
+    price = 0;*/
     /*
     {
-      "author": "Opium.Team",
-      "description": "ETH/DAI Oracle",
-      "asset": "ETH/DAI",
+      "author": "OlivaCoin.Raul",
+      "description": "OlivaFuturesPrice Oracle",
+      "asset": "OliveOil",
       "type": "onchain",
       "source": "chainlink",
       "logic": "none",
       "path": "latestAnswer()"
     }
     */
-    emit MetadataSet("{\"author\":\"Opium.Team\",\"description\":\"ETH/DAI Oracle\",\"asset\":\"ETH/DAI\",\"type\":\"onchain\",\"source\":\"chainlink\",\"logic\":\"none\",\"path\":\"latestAnswer()\"}");
+    emit MetadataSet("{\"author\":\"OlivaCoin.Raul\",\"description\":\"OlivaFuturesPrice Oracle\",\"asset\":\"OliveOil\",\"type\":\"onchain\",\"source\":\"chainlink\",\"logic\":\"none\",\"path\":\"latestAnswer()\"}");
   }
 
   /** OPIUM */
@@ -80,27 +98,47 @@ contract ETHDAIChainlinkOracleId is IOracleId, Ownable {
       "Only when no data and after timestamp allowed"
     );
 
-    uint256 result = getReversedLatestPrice();
-    oracleAggregator.__callback(timestamp, result);
+    oracleAggregator.__callback(timestamp, price);
 
-    emit Provided(_queryId, timestamp, result);
+    emit Provided(_queryId, timestamp, price);
   }
 
   /** CHAINLINK */
   /**
-    @notice Returns DAI/ETH Price
-   */
-  function getLatestPrice() public view returns (int256) {
-    return ref.latestAnswer();
+    @notice request latest oliva price 
+   */  
+   function requestPrice() public returns (bytes32 requestId) {
+
+      Chainlink.Request memory request = buildChainlinkRequest(jobId, address(this), this.fulfill.selector);
+        
+      // Set the URL to perform the GET request on
+      request.add("get", "http://kohonen.pythonanywhere.com/");
+        
+      // Set the path to find the desired data in the API response, where the response format is:
+      // {
+      //   "price": xxx.xxx,
+      // }
+
+      request.add("path", "price");
+        
+        // Multiply the result by 1000000000000000000 to remove decimals
+      int timesAmount = 10**18;
+      request.addInt("times", timesAmount);
+        
+      // Sends the request
+      return sendChainlinkRequestTo(oracle, request, fee);
+  }
+    
+  /**
+  * Receive the response in the form of uint256
+  */ 
+  function fulfill(bytes32 _requestId, uint256 _price) public recordChainlinkFulfillment(_requestId)
+  {
+    price = _price;
   }
 
-  /**
-    @notice Returns ETH/DAI Price
-   */
-  function getReversedLatestPrice() public view returns (uint256) {
-    uint256 price = uint256(getLatestPrice());
-    return CHAINLINK_ETH_BASE.mul(DAI_DECIMALS).div(price);
-  }
+
+
 
   /** GOVERNANCE */
   /** 
@@ -121,5 +159,11 @@ contract ETHDAIChainlinkOracleId is IOracleId, Ownable {
 
   function setEmergencyPeriod(uint256 _emergencyPeriod) public onlyOwner {
     EMERGENCY_PERIOD = _emergencyPeriod;
+  }
+
+  function withdrawLink() public onlyOwner {
+    LinkTokenInterface link = LinkTokenInterface(chainlinkTokenAddress());
+    
+    require(link.transfer(msg.sender, link.balanceOf(address(this))), "Unable to transfer");
   }
 }

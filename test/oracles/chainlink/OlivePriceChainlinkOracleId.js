@@ -1,20 +1,31 @@
 const { accounts, contract, web3 } = require('@openzeppelin/test-environment')
 const { expectRevert } = require('@openzeppelin/test-helpers')
 const { assert } = require('chai')
-
+const { BigNumber } = require('ethers')
+const { ethers } = require('hardhat')
+const erc20ABI = require('../../utils/erc20abi.json')
 const [ owner ] = accounts
 
-const ETHDAIChainlinkOracleId = contract.fromArtifact('ETHDAIChainlinkOracleId')
+const OlivePriceChainlinkOracleId = contract.fromArtifact('OlivePriceChainlinkOracleId')
 const OracleAggregator = contract.fromArtifact('OracleAggregator')
 
-const ETHDAIAggregator = '0x037E8F2125bF532F3e228991e051c8A7253B642c'
-const OpiumOracleAggregator = '0xB69890912E40A7849fCA058bb118Cfe7d70932c4'
+
+const OpiumOracleAggregator = '0xe1Fd20231512611a5025Dec275464208070B985f'
 const EMERGENCY_PERIOD = 60
 
-describe('ETHDAIChainlinkOracleId', function () {
+async function fillWithLink(owner, priceOracle) {
+  let linkAddress = await priceOracle.chainlinkTokenAddress()
+  let link = new web3.eth.Contract(erc20ABI,linkAddress)
+  let tx = await link.transfer(priceOracle.address, web3.utils.toWei('0.1')).send({ from: owner })
+  console.log(tx)
+}
+
+describe('OlivePriceChainlinkOracleId', function () {
   before(async () => {
-    this.oracleId = await ETHDAIChainlinkOracleId.new(ETHDAIAggregator, OpiumOracleAggregator, EMERGENCY_PERIOD, { from: owner })
+    this.oracleId = await OlivePriceChainlinkOracleId.new(OpiumOracleAggregator, EMERGENCY_PERIOD, { from: owner })
     this.oracleAggregator = await OracleAggregator.at(OpiumOracleAggregator)
+    console.log(owner)
+    await fillWithLink(owner, this.oracleId)
 
     this.now = ~~(Date.now() / 1e3) // timestamp now
     this.past = ~~(Date.now() / 1e3) - 60 // timestamp 60 seconds ago
@@ -23,18 +34,24 @@ describe('ETHDAIChainlinkOracleId', function () {
     this.queryIdPast = web3.utils.soliditySha3(this.oracleId.address, this.past)
   })
 
-  it('should be able to return price from Chainlink', async () => {
-    const price = await this.oracleId.getLatestPrice()
+  it('should be able to request price from Chainlink', async () => {
+    const requestID = await this.oracleId.requestPrice().send()
 
-    assert.exists(price, 'Price was not returned correctly')
+    assert.exists(requestID, 'Price was not requested correctly')
+    const price = await this.oracleId.price.call()
+    console.log(price.toString())
+    assert.notEqual(price.toString(),'0')
   })
 
-  it('should be able to return reversed price', async () => {
-    const reversedPrice = await this.oracleId.getReversedLatestPrice()
-    this.reversedPrice = reversedPrice
+  it('should be able to fulfill request from Chainlink', async () => {
+    await this.oracleId.fulfill('123', '234').send()
+    let price = this.oracleId.price.call()
 
-    assert.exists(reversedPrice, 'Reversed price was not returned correctly')
+
+    assert.equal(price,new BigNumber('234'), 'Price was not requested correctly')
   })
+
+
 
   it('should request price via Opium OracleAggregator', async () => {
     await this.oracleAggregator.fetchData(this.oracleId.address, this.now)
@@ -49,7 +66,6 @@ describe('ETHDAIChainlinkOracleId', function () {
     const data = await this.oracleAggregator.getData.call(this.oracleId.address, this.now)
 
     assert.isTrue(hasData, 'Data was not provided')
-    assert.equal(data.toString(), this.reversedPrice.toString(), 'Data do not match')
   })
 
   it('should not allow to call emergencyCallback after data are provided', async () => {

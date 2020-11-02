@@ -3,9 +3,12 @@ node_modules/
 
 # Contracts
 build/
+artifacts/
 
 # Testing
 test-environment.config.js
 
 # Ddeploying
 networks.js
+secrets.json
+.openzeppelin/.session

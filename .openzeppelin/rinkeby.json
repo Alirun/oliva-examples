@@ -1,0 +1,14 @@
+{
+  "contracts": {},
+  "solidityLibs": {},
+  "proxies": {
+    "OlivaFutures/OlivePriceChainlinkOracleId": [
+      {
+        "address": "0xb8F871B2dCb059ea500C37c60d0DAf6A780e9669",
+        "kind": "NonProxy",
+        "bytecodeHash": "6f64faff6f49ef87c5e289ba820402ce35fe985b18cb8b1736a8ff60e5bf7055"
+      }
+    ]
+  },
+  "manifestVersion": "2.2"
+}
