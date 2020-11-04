@@ -11,10 +11,10 @@ import "opium-contracts/contracts/OracleAggregator.sol";
 contract OlivePriceChainlinkOracleId is ChainlinkClient, IOracleId, Ownable {
   using SafeMath for uint256;
 
-  event Requested(bytes32 indexed queryId, uint256 indexed timestamp);
-  event Provided(bytes32 indexed queryId, uint256 indexed timestamp, uint256 result);
+  event Requested(uint256 indexed timestamp);
+  event Provided(uint256 indexed timestamp, uint256 result);
 
-  mapping (bytes32 => uint256) public pendingQueries;
+  mapping (bytes32 => uint256) public pendingRequests;
 
   // Opium
   OracleAggregator public oracleAggregator;
@@ -26,10 +26,6 @@ contract OlivePriceChainlinkOracleId is ChainlinkClient, IOracleId, Ownable {
 
   // Governance
   uint256 public EMERGENCY_PERIOD;
-
-  // Price data
-  uint256 public price;
-  
 
   constructor(OracleAggregator _oracleAggregator, uint256 _emergencyPeriod) public {
     oracleAggregator = _oracleAggregator;
@@ -68,47 +64,34 @@ contract OlivePriceChainlinkOracleId is ChainlinkClient, IOracleId, Ownable {
 
   /** OPIUM */
   function fetchData(uint256 _timestamp) external payable {
-    require(_timestamp > 0, "Timestamp must be nonzero");
-
-    bytes32 queryId = keccak256(abi.encodePacked(address(this), _timestamp));
-    pendingQueries[queryId] = _timestamp;
-    emit Requested(queryId, _timestamp);
+    _timestamp;
+    revert("N.S"); // N.S = not supported
   }
 
   function recursivelyFetchData(uint256 _timestamp, uint256 _period, uint256 _times) external payable {
-    require(_timestamp > 0, "Timestamp must be nonzero");
-
-    for (uint256 i = 0; i < _times; i++) {
-      uint256 moment = _timestamp + _period * i;
-      bytes32 queryId = keccak256(abi.encodePacked(address(this), moment));
-      pendingQueries[queryId] = moment;
-      emit Requested(queryId, moment);
-    }
+    _timestamp;
+    _period;
+    _times;
+    revert("N.S"); // N.S = not supported
   }
 
   function calculateFetchPrice() external returns (uint256) {
     return 0;
   }
   
-  function _callback(bytes32 _queryId) public {
-    uint256 timestamp = pendingQueries[_queryId];
-    require(
-      !oracleAggregator.hasData(address(this), timestamp) &&
-      timestamp < now,
-      "Only when no data and after timestamp allowed"
-    );
+  function _fulfill(bytes32 _requestId, uint256 _price) private {
+    uint256 timestamp = pendingRequests[_requestId];
 
-    oracleAggregator.__callback(timestamp, price);
+    oracleAggregator.__callback(timestamp, _price);
 
-    emit Provided(_queryId, timestamp, price);
+    emit Provided(timestamp, _price);
   }
 
   /** CHAINLINK */
   /**
     @notice request latest oliva price 
    */  
-   function requestPrice() public returns (bytes32 requestId) {
-
+   function requestPrice(uint256 _timestamp) public onlyOwner returns (bytes32 requestId) {
       Chainlink.Request memory request = buildChainlinkRequest(jobId, address(this), this.fulfill.selector);
         
       // Set the URL to perform the GET request on
@@ -126,7 +109,11 @@ contract OlivePriceChainlinkOracleId is ChainlinkClient, IOracleId, Ownable {
       request.addInt("times", timesAmount);
         
       // Sends the request
-      return sendChainlinkRequestTo(oracle, request, fee);
+      requestId = sendChainlinkRequestTo(oracle, request, fee);
+
+      pendingRequests[requestId] = _timestamp;
+
+      emit Requested(_timestamp);
   }
     
   /**
@@ -134,27 +121,23 @@ contract OlivePriceChainlinkOracleId is ChainlinkClient, IOracleId, Ownable {
   */ 
   function fulfill(bytes32 _requestId, uint256 _price) public recordChainlinkFulfillment(_requestId)
   {
-    price = _price;
+    _fulfill(_requestId, _price);
   }
-
-
-
 
   /** GOVERNANCE */
   /** 
     Emergency callback allows to push data manually in case EMERGENCY_PERIOD elapsed and no data were provided
    */
-  function emergencyCallback(bytes32 _queryId, uint256 _result) public onlyOwner {
-    uint256 timestamp = pendingQueries[_queryId];
+  function emergencyCallback(uint256 _timestamp, uint256 _result) public onlyOwner {
     require(
-      !oracleAggregator.hasData(address(this), timestamp) &&
-      timestamp + EMERGENCY_PERIOD  < now,
-      "Only when no data and after emergency period allowed"
+      !oracleAggregator.hasData(address(this), _timestamp) &&
+      _timestamp + EMERGENCY_PERIOD  < now,
+      "N.E" // N.E = Only when no data and after emergency period allowed
     );
 
-    oracleAggregator.__callback(timestamp, _result);
+    oracleAggregator.__callback(_timestamp, _result);
 
-    emit Provided(_queryId, timestamp, _result);
+    emit Provided(_timestamp, _result);
   }
 
   function setEmergencyPeriod(uint256 _emergencyPeriod) public onlyOwner {
