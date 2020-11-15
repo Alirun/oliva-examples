@@ -12,3 +12,4 @@ test-environment.config.js
 networks.js
 secrets.json
 .openzeppelin/.session
+cache/
