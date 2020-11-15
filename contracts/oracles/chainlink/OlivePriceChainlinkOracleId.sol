@@ -35,9 +35,11 @@ contract OlivePriceChainlinkOracleId is ChainlinkClient, IOracleId, Ownable {
     /**
     Rinkeby
      */
-    oracle = 0x7AFe1118Ea78C1eae84ca8feE5C65Bc76CcF879e;
-    jobId = "6d1bfe27e7034b1d87b5270556b17277";
-    fee = 0.1 * 10 ** 18; // 0.1 LINK
+    setChainlinkNodeData(
+      0x7AFe1118Ea78C1eae84ca8feE5C65Bc76CcF879e,
+      "6d1bfe27e7034b1d87b5270556b17277",
+      0.1 * 10 ** 18 // 0.1 LINK
+    );
     
     /**
      * Mainnet
@@ -61,6 +63,8 @@ contract OlivePriceChainlinkOracleId is ChainlinkClient, IOracleId, Ownable {
     */
     emit MetadataSet("{\"author\":\"OlivaCoin.Raul\",\"description\":\"OlivaFuturesPrice Oracle\",\"asset\":\"OliveOil\",\"type\":\"onchain\",\"source\":\"chainlink\",\"logic\":\"none\",\"path\":\"latestAnswer()\"}");
   }
+
+
 
   /** OPIUM */
   function fetchData(uint256 _timestamp) external payable {
@@ -114,6 +118,12 @@ contract OlivePriceChainlinkOracleId is ChainlinkClient, IOracleId, Ownable {
       pendingRequests[requestId] = _timestamp;
 
       emit Requested(_timestamp);
+  }
+
+  function setChainlinkNodeData(address _oracle, bytes32 _jobId, uint256 _fee) public onlyOwner {
+    oracle = _oracle;
+    jobId = _jobId;
+    fee = _fee;
   }
     
   /**

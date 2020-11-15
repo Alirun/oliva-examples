@@ -13,48 +13,24 @@ const OpiumOracleAggregator = '0xe1Fd20231512611a5025Dec275464208070B985f'
 const EMERGENCY_PERIOD = 60
 
 let linkAddress = '0x01BE23585060835E02B77ef475b0Cc51aA1e0709'
+let deployedOracleAddress = '0x9eD34492F812a2C2a2ce37c481b2D0D51f6d33bc'
 
 async function main() {
   let accounts = await web3.eth.getAccounts()
   let owner = accounts[0]
   // Rinkeby
-  const OracleContract = new web3.eth.Contract(oracleContractData.abi)
-  let oracleId = await OracleContract.deploy({
-    data: oracleContractData.bytecode,
-    arguments: [
-      OpiumOracleAggregator,
-      EMERGENCY_PERIOD
-    ]
-  })
-  .send({
-      from: owner,
-      gas: 5000000
-  })
-  console.log('Deployed at: ',oracleId.options.address)
+  const OracleContract = new web3.eth.Contract(oracleContractData.abi, deployedOracleAddress)
 
-  var price = await oracleId.methods.price().call()
-  console.log('price', price)
-  console.log('funding contract with link')
+  console.log('Oracle at: ',deployedOracleAddress)
+
+  console.log('withdraw link...')
   const LinkContract = new web3.eth.Contract(erc20ABI, linkAddress)
-  await LinkContract.methods.transfer(oracleId.options.address, web3.utils.toWei('1')).send({
+
+
+  await OracleContract.methods.withdrawLink().send({
     from: owner
   })
-
-  var contractBalance = await LinkContract.methods.balanceOf(oracleId.options.address).call()
-  console.log('balance before requesting', contractBalance)
-
-  console.log('Requesting price...')
-  var res = await oracleId.methods.requestPrice().send({
-    from: owner,
-    gas: 5000000
-  })
-  console.log(res)
-  var price = await oracleId.methods.price().call()
-  console.log('price', price)
-  await oracleId.methods.withdrawLink().send({
-    from: owner
-  })
-  contractBalance = await LinkContract.methods.balanceOf(oracleId.options.address).call()
+  contractBalance = await LinkContract.methods.balanceOf(deployedOracleAddress).call()
   console.log('balance after withdraw', contractBalance)
 
 
